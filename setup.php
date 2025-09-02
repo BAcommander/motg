@@ -168,7 +168,7 @@ require_once 'config/config.php';
                         </div>
                     </div>
                 </form>
-                <button id="create-player-btn" class="btn-primary" onclick="createPlayer()">
+                <button id="create-player-btn" class="btn-primary" onclick="createPlayer()" disabled>
                     Create Player & Start Game
                 </button>
             </div>
@@ -282,6 +282,8 @@ require_once 'config/config.php';
             const formData = new FormData(document.getElementById('game-setup-form'));
             const gameData = Object.fromEntries(formData.entries());
             
+            console.log('Creating game with data:', gameData);
+            
             document.getElementById('create-game-btn').disabled = true;
             document.getElementById('create-game-btn').textContent = 'Creating...';
             
@@ -290,13 +292,35 @@ require_once 'config/config.php';
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify(gameData)
             })
-            .then(response => response.json())
+            .then(response => {
+                console.log('Response status:', response.status);
+                console.log('Response headers:', response.headers);
+                
+                // Get the raw text first to debug
+                return response.text().then(text => {
+                    console.log('Raw response text:', text);
+                    console.log('Response length:', text.length);
+                    console.log('First 100 chars:', text.substring(0, 100));
+                    
+                    try {
+                        return JSON.parse(text);
+                    } catch (e) {
+                        console.error('JSON parse error:', e);
+                        console.error('Problematic text:', text);
+                        throw new Error('Invalid JSON response: ' + text.substring(0, 200));
+                    }
+                });
+            })
             .then(data => {
+                console.log('Game creation response:', data);
                 if (data.success) {
                     gameId = data.game_id;
                     document.getElementById('game-status').className = 'status-indicator status-success';
                     document.getElementById('create-game-btn').textContent = 'Game Created!';
                     updateSetupStatus('Game created successfully! Game ID: ' + gameId);
+                    
+                    // Enable player creation step
+                    document.getElementById('create-player-btn').disabled = false;
                 } else {
                     document.getElementById('game-status').className = 'status-indicator status-error';
                     document.getElementById('create-game-btn').disabled = false;
@@ -306,8 +330,10 @@ require_once 'config/config.php';
             })
             .catch(error => {
                 console.error('Error creating game:', error);
+                document.getElementById('game-status').className = 'status-indicator status-error';
                 document.getElementById('create-game-btn').disabled = false;
                 document.getElementById('create-game-btn').textContent = 'Create Game';
+                updateSetupStatus('Network error creating game', true);
             });
         }
         

@@ -1,4 +1,8 @@
 <?php
+// Suppress PHP warnings for clean game interface
+error_reporting(E_ALL & ~E_DEPRECATED & ~E_WARNING);
+ini_set('display_errors', 0);
+
 session_start();
 require_once 'config/config.php';
 require_once 'includes/functions.php';
@@ -28,13 +32,13 @@ $current_turn = $game->getCurrentTurn();
         <header class="game-header">
             <h1>Master of the Galaxy</h1>
             <div class="empire-info">
-                <span class="empire-name"><?php echo htmlspecialchars($empire['name']); ?></span>
-                <span class="race-name"><?php echo htmlspecialchars($empire['race_name']); ?></span>
+                <span class="empire-name"><?php echo htmlspecialchars($empire['empire_name'] ?? 'Unknown Empire'); ?></span>
+                <span class="race-name"><?php echo htmlspecialchars($empire['race_name'] ?? 'Unknown Race'); ?></span>
                 <span class="turn-info">Turn <?php echo $current_turn; ?></span>
             </div>
             <div class="resources">
-                <span class="bc">BC: <?php echo number_format($empire['credits']); ?></span>
-                <span class="research">Research: <?php echo number_format($empire['research_points']); ?></span>
+                <span class="bc">BC: <?php echo number_format($empire['credits'] ?? 0); ?></span>
+                <span class="research">Research: <?php echo number_format($empire['research_points'] ?? 0); ?></span>
             </div>
         </header>
 

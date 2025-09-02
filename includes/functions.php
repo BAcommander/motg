@@ -153,19 +153,20 @@ function generateGalaxy($game_id, $galaxy_size, $num_players) {
         'huge' => 2.0
     ];
     
-    $base_systems = $num_players * SYSTEMS_PER_PLAYER;
-    $total_systems = floor($base_systems * $size_multiplier[$galaxy_size]);
+    $systems_per_player = 15; // Default value
+    $base_systems = $num_players * $systems_per_player;
+    $total_systems = max(20, floor($base_systems * $size_multiplier[$galaxy_size]));
     
     // Generate galaxy dimensions
-    $galaxy_radius = sqrt($total_systems) * 15;
+    $galaxy_radius = (int)(sqrt($total_systems) * 15);
     
     for ($i = 0; $i < $total_systems; $i++) {
         // Generate random coordinates within galaxy bounds
         $angle = rand(0, 360) * (M_PI / 180);
         $distance = rand(10, $galaxy_radius);
         
-        $x = $distance * cos($angle);
-        $y = $distance * sin($angle);
+        $x = (int)($distance * cos($angle));
+        $y = (int)($distance * sin($angle));
         
         $system_name = generateSystemName();
         $star_types = ['red', 'orange', 'yellow', 'white', 'blue'];
@@ -180,7 +181,9 @@ function generateGalaxy($game_id, $galaxy_size, $num_players) {
         $system_id = $pdo->lastInsertId();
         
         // Generate planets for this system
-        $num_planets = rand(PLANETS_PER_SYSTEM_MIN, PLANETS_PER_SYSTEM_MAX);
+        $planets_per_system_min = 1;
+        $planets_per_system_max = 5;
+        $num_planets = rand($planets_per_system_min, $planets_per_system_max);
         generatePlanetsForSystem($system_id, $system_name, $num_planets);
     }
 }
@@ -191,12 +194,13 @@ function generateGalaxy($game_id, $galaxy_size, $num_players) {
 function generatePlanetsForSystem($system_id, $system_name, $num_planets) {
     global $pdo;
     
-    $planet_types = array_keys(PLANET_TYPES);
+    $planet_types = ['terran', 'ocean', 'swamp', 'arid', 'desert', 'tundra', 'barren'];
+    $planet_max_pops = ['terran' => 10, 'ocean' => 8, 'swamp' => 6, 'arid' => 8, 'desert' => 6, 'tundra' => 5, 'barren' => 3];
     
     for ($orbit = 1; $orbit <= $num_planets; $orbit++) {
         $planet_name = generatePlanetName($system_name, $orbit);
         $planet_type = $planet_types[array_rand($planet_types)];
-        $planet_data = PLANET_TYPES[$planet_type];
+        $max_population = $planet_max_pops[$planet_type];
         
         $sizes = ['tiny', 'small', 'medium', 'large', 'huge'];
         $size = $sizes[array_rand($sizes)];
@@ -215,7 +219,7 @@ function generatePlanetsForSystem($system_id, $system_name, $num_planets) {
         ");
         $stmt->execute([
             $system_id, $planet_name, $orbit, $planet_type, $size,
-            $planet_data['max_pop'], $richness, $gravity, $planet_type
+            $max_population, $richness, $gravity, $planet_type
         ]);
     }
 }
@@ -251,11 +255,26 @@ function createStartingColony($player_id, $game_id) {
         JOIN systems s ON p.system_id = s.system_id 
         WHERE s.game_id = ? AND p.climate = 'terran' 
         AND p.planet_id NOT IN (SELECT planet_id FROM colonies)
-        ORDER BY RAND() 
+        ORDER BY RANDOM() 
         LIMIT 1
     ");
     $stmt->execute([$game_id]);
     $homeworld = $stmt->fetch();
+    
+    if (!$homeworld) {
+        // If no terran planet, find any habitable planet
+        $stmt = $pdo->prepare("
+            SELECT p.*, s.name as system_name 
+            FROM planets p 
+            JOIN systems s ON p.system_id = s.system_id 
+            WHERE s.game_id = ? AND p.climate NOT IN ('toxic', 'radiated')
+            AND p.planet_id NOT IN (SELECT planet_id FROM colonies)
+            ORDER BY RANDOM() 
+            LIMIT 1
+        ");
+        $stmt->execute([$game_id]);
+        $homeworld = $stmt->fetch();
+    }
     
     if (!$homeworld) {
         throw new Exception("No suitable homeworld found!");
@@ -264,6 +283,7 @@ function createStartingColony($player_id, $game_id) {
     // Create colony
     $colony_name = $homeworld['system_name'] . " Prime";
     $current_turn = 1;
+    $starting_population = 2500; // Default starting population
     
     $stmt = $pdo->prepare("
         INSERT INTO colonies (planet_id, player_id, name, population, farmers, workers, 
@@ -272,9 +292,9 @@ function createStartingColony($player_id, $game_id) {
     ");
     $stmt->execute([
         $homeworld['planet_id'], $player_id, $colony_name,
-        STARTING_POPULATION, 
-        floor(STARTING_POPULATION * 0.5), // 50% farmers initially
-        floor(STARTING_POPULATION * 0.5), // 50% workers initially
+        $starting_population, 
+        floor($starting_population * 0.5), // 50% farmers initially
+        floor($starting_population * 0.5), // 50% workers initially
         0, // No scientists initially
         $current_turn
     ]);

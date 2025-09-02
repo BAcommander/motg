@@ -1,5 +1,10 @@
 <?php
 // Database configuration
+// Using SQLite for easier setup (no MySQL server required)
+define('DB_TYPE', 'sqlite');
+define('DB_PATH', __DIR__ . '/../database/master_of_galaxy.db');
+
+// MySQL configuration (if you prefer MySQL)
 define('DB_HOST', 'localhost');
 define('DB_NAME', 'master_of_galaxy');
 define('DB_USER', 'root');
@@ -149,16 +154,32 @@ define('BUILDINGS', [
 
 // Initialize database connection
 try {
-    $pdo = new PDO(
-        "mysql:host=" . DB_HOST . ";dbname=" . DB_NAME . ";charset=utf8mb4",
-        DB_USER,
-        DB_PASS,
-        [
-            PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION,
-            PDO::ATTR_DEFAULT_FETCH_MODE => PDO::FETCH_ASSOC,
-            PDO::ATTR_EMULATE_PREPARES => false
-        ]
-    );
+    if (defined('DB_TYPE') && DB_TYPE === 'sqlite') {
+        // SQLite connection (easier setup, no server required)
+        $pdo = new PDO(
+            "sqlite:" . DB_PATH,
+            null,
+            null,
+            [
+                PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION,
+                PDO::ATTR_DEFAULT_FETCH_MODE => PDO::FETCH_ASSOC
+            ]
+        );
+        // Enable foreign key constraints for SQLite
+        $pdo->exec('PRAGMA foreign_keys = ON');
+    } else {
+        // MySQL connection
+        $pdo = new PDO(
+            "mysql:host=" . DB_HOST . ";dbname=" . DB_NAME . ";charset=utf8mb4",
+            DB_USER,
+            DB_PASS,
+            [
+                PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION,
+                PDO::ATTR_DEFAULT_FETCH_MODE => PDO::FETCH_ASSOC,
+                PDO::ATTR_EMULATE_PREPARES => false
+            ]
+        );
+    }
 } catch (PDOException $e) {
     die("Database connection failed: " . $e->getMessage());
 }
